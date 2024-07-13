@@ -5,6 +5,8 @@ tileset:
     - layers/transportation/transportation.yaml
     - layers/poi/poi.yaml
     - layers/heat/heat.yaml
+    - layers/building_area/area.yaml
+    - layers/building_area_name/area_name.yaml
   name: indoor=
   version: 0.4.0
   id: indoorequal

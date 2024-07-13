@@ -1,0 +1,15 @@
+layer:
+  id: "building_area"
+  description: |
+    This layer includes building area.
+  buffer_size: 4
+  datasource:
+    geometry_field: geometry
+    query: (SELECT geometry FROM layer_building_area(!bbox!, z(!scale_denominator!))) AS t
+  vars:
+    indoor_zoom: 17
+schema:
+  - ./layer.sql
+datasources:
+  - type: imposm3
+    mapping_file: ./mapping.yaml

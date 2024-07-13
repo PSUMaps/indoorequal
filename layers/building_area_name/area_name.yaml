@@ -1,0 +1,16 @@
+layer:
+  id: "building_area_name"
+  requires: "building_area"
+  description:  |
+    This is the layer for labelling the building areas.
+  buffer_size: 4
+  fields:
+    name: The OSM [`name`](http://wiki.openstreetmap.org/wiki/Key:name) value
+  datasource:
+    geometry_field: geometry
+    query: (SELECT geometry, name FROM layer_building_area_name(!bbox!, z(!scale_denominator!))) AS t
+  vars:
+    indoor_zoom: 17
+schema:
+  - ./update_area_point.sql
+  - ./layer.sql

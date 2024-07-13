@@ -1,0 +1,16 @@
+tables:
+  building_polygon:
+    type: polygon
+    filters:
+      require:
+        name: [__any__]
+        building: ['yes']
+    mapping:
+      building: [ __any__ ]
+    columns:
+    - name: name
+      key: name
+      type: string
+    - name: geometry
+      type: geometry
+
