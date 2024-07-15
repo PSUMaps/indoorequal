@@ -3,9 +3,11 @@ layer:
   description: |
     This layer includes building area.
   buffer_size: 4
+  fields:
+    height: Building height
   datasource:
     geometry_field: geometry
-    query: (SELECT geometry FROM layer_building_area(!bbox!, z(!scale_denominator!))) AS t
+    query: (SELECT geometry, height FROM layer_building_area(!bbox!, z(!scale_denominator!))) AS t
   vars:
     indoor_zoom: 17
 schema:

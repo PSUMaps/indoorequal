@@ -13,4 +13,7 @@ tables:
       type: string
     - name: geometry
       type: geometry
+    - name: height
+      key: height
+      type: integer
 
