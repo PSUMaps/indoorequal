@@ -13,7 +13,8 @@ tables:
         level: '^-?\d+\.?\d*([;-]-?\d+\.?\d*)*$'
     fields:
     - name: osm_id
-      type: id
+      type: integer
+      key: id
     - name: class
       key: highway
       type: string

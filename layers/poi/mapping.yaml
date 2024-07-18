@@ -448,7 +448,8 @@ def_poi_mapping_waterway: &poi_mapping_waterway
 
 def_poi_fields: &poi_fields
   - name: osm_id
-    type: id
+    type: integer
+    key: id
   - name: geometry
     type: geometry
   - name: area

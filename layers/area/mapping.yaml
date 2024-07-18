@@ -24,7 +24,8 @@ tables:
         level: '^-?\d+\.?\d*([;-]-?\d+\.?\d*)*$'
     fields:
     - name: osm_id
-      type: id
+      type: integer
+      key: id
     - name: class
       type: mapping_value
     - name: subclass
@@ -69,7 +70,8 @@ tables:
         level: '^-?\d+\.?\d*([;-]-?\d+\.?\d*)*$'
     fields:
     - name: osm_id
-      type: id
+      type: integer
+      key: id
     - name: class
       key: indoor
       type: string
