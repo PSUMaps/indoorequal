@@ -36,7 +36,7 @@ CREATE OR REPLACE FUNCTION building_area_point.refresh() RETURNS trigger AS
 language plpgsql;
 
 CREATE TRIGGER trigger_flag_point
-    AFTER INSERT OR UPDATE OR DELETE ON osm_indoor_polygon
+    AFTER INSERT OR UPDATE OR DELETE ON osm_building_polygon
     FOR EACH STATEMENT
     EXECUTE PROCEDURE building_area_point.flag();
 
