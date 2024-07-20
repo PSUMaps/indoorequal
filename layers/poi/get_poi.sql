@@ -49,15 +49,3 @@ RETURNS TEXT AS $$
         ) AS poi_union
   ) AS feature;
 $$ LANGUAGE SQL IMMUTABLE;
-
-CREATE OR REPLACE FUNCTION get_indoor(global_id varchar)
-    RETURNS TEXT AS
-$$
-SELECT ST_AsGeoJSON(feature.*)
-FROM (SELECT osm_id                       AS id,
-             ST_Transform(geometry, 4326) AS geometry,
-             NULLIF(name, '')             AS name,
-             tags
-      FROM osm_indoor_polygon
-      WHERE osm_id = global_id::int) AS feature;
-$$ LANGUAGE SQL IMMUTABLE;
