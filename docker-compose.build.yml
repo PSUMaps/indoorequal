@@ -1,0 +1,59 @@
+# Docker Compose configuration for building immutable PostGIS image
+# This is used during the build process to import data into PostgreSQL
+
+volumes:
+  pgdata_build:
+
+networks:
+  build:
+
+services:
+  # PostgreSQL for data import (build stage)
+  postgres-build:
+    image: "ghcr.io/psumaps/postgis:7.1.1"
+    command: postgres -c jit=off -c shared_buffers=512MB -c work_mem=50MB -c maintenance_work_mem=256MB
+    networks:
+      - build
+    environment:
+      POSTGRES_DB: openmaptiles
+      POSTGRES_USER: openmaptiles
+      POSTGRES_PASSWORD: openmaptiles
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - pgdata_build:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openmaptiles -d openmaptiles"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # OpenMapTiles tools for importing data
+  openmaptiles-tools-build:
+    image: "ghcr.io/psumaps/openmaptiles-tools:7.1.0"
+    environment:
+      POSTGRES_HOST: postgres-build
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: openmaptiles
+      POSTGRES_USER: openmaptiles
+      POSTGRES_PASSWORD: openmaptiles
+      DIFF_MODE: ${DIFF_MODE:-false}
+      MIN_ZOOM: ${MIN_ZOOM:-0}
+      MAX_ZOOM: ${MAX_ZOOM:-14}
+      BBOX: ${BBOX}
+      IMPOSM_CONFIG_FILE: ${IMPOSM_CONFIG_FILE}
+      MAX_PARALLEL_PSQL: ${MAX_PARALLEL_PSQL:-5}
+    networks:
+      - build
+    depends_on:
+      postgres-build:
+        condition: service_healthy
+    volumes:
+      - .:/tileset
+      - ./data:/import
+      - ./build/sql:/sql
+      - ./build:/mapping
+      - ./cache:/cache
+    profiles:
+      - tools
+

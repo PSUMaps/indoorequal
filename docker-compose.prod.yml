@@ -1,0 +1,85 @@
+# Docker Compose configuration for production deployment
+# Uses immutable PostgreSQL image with pre-imported data
+
+networks:
+  indoor:
+
+services:
+  # Martin tile server
+  martin:
+    image: ghcr.io/maplibre/martin:1.2.0
+    command: '--config /config.yaml'
+    restart: unless-stopped
+    env_file: .env
+    networks:
+      - indoor
+    volumes:
+      - './marting_config.yaml:/config.yaml:ro'
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # PostgREST API
+  postgrest:
+    image: postgrest/postgrest:v14.3
+    restart: unless-stopped
+    networks:
+      - indoor
+    environment:
+      PGRST_DB_URI: postgres://openmaptiles:openmaptiles@postgres:5432/openmaptiles
+      PGRST_OPENAPI_SERVER_PROXY_URI: http://127.0.0.1:3000
+      PGRST_ADMIN_SERVER_PORT: 3001
+      PGRST_DB_ANON_ROLE: web_anon
+      PGRST_LOG_LEVEL: info
+      PGRST_SERVER_TIMING_ENABLED: "true"
+      PGRST_SERVER_TRACE_HEADER: traceparent
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Immutable PostgreSQL with pre-imported data
+  postgres:
+    image: "ghcr.io/psumaps/postgis:immutable"
+    restart: always
+    networks:
+      - indoor
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: openmaptiles
+      POSTGRES_USER: openmaptiles
+      POSTGRES_PASSWORD: openmaptiles
+    # NO VOLUMES - data is baked into the image!
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openmaptiles -d openmaptiles"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # LOD cache service
+  lod-cache:
+    image: 'ijo42/lod:test'
+    command: '--conf /opt/lod_config.toml'
+    restart: always
+    networks:
+      - indoor
+    ports:
+      - "1337:1337"
+    volumes:
+      - ./lod_config.toml:/opt/lod_config.toml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.lod2.rule=Host(`tiles2.ijo42.ru`) && PathPrefix(`/tiles`)"
+      - "traefik.http.routers.lod2.tls.certresolver=ijoresolv"
+      - "traefik.http.services.lod2.loadbalancer.server.port=1337"
+      - "traefik.http.routers.lod2.entrypoints=websecure"
+      - "traefik.http.routers.lod2.middlewares=corspreflight-middleware,ical"
+      - "traefik.http.middlewares.ical.plugin.ical.AllowSubnet=212.192.64.0/19"
+      - "traefik.http.middlewares.corspreflight-middleware.plugin.corspreflight.allowCredentials=false"
+

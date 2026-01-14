@@ -210,6 +210,14 @@ Hints for Docker management:
   make refresh-docker-images           # refresh openmaptiles docker images from Docker HUB
   make remove-docker-images            # remove openmaptiles docker images
   make list-docker-images              # show a list of available docker images
+
+Hints for building immutable PostGIS image:
+  make build-immutable-image           # build immutable PostGIS image with imported PBF data
+  make start-db-build                  # start PostgreSQL build database
+  make stop-db-build                   # stop PostgreSQL build database
+  make import-osm-build                # import OSM data into build database
+  make import-sql-build                # import SQL layers into build database
+  make destroy-db-build                # destroy build database and volumes
 ==============================================================================
 endef
 export HELP_MESSAGE
@@ -563,3 +571,72 @@ debug:  ## Use this target when developing Makefile itself to verify loaded envi
 	@echo BBOX = $(BBOX) , $$BBOX
 	@echo MIN_ZOOM = $(MIN_ZOOM) , $$MIN_ZOOM
 	@echo MAX_ZOOM = $(MAX_ZOOM) , $$MAX_ZOOM
+
+#
+# Immutable PostGIS image building targets
+#
+
+# Docker Compose for build environment
+DC_BUILD := docker-compose -f docker-compose.build.yml --project-name indoorequal-build
+
+.PHONY: start-db-build
+start-db-build: init-dirs
+	@echo "Starting PostgreSQL build database using ghcr.io/psumaps/postgis:7.1.1..."
+	$(DC_BUILD) up -d postgres-build
+	@echo "Waiting for PostgreSQL to be ready..."
+	$(DC_BUILD) run --rm openmaptiles-tools-build pgwait
+
+.PHONY: stop-db-build
+stop-db-build:
+	@echo "Stopping PostgreSQL build database..."
+	$(DC_BUILD) stop postgres-build
+
+.PHONY: import-osm-build
+import-osm-build: all start-db-build
+	@$(assert_area_is_given)
+	@echo "Importing OSM data $(PBF_FILE) into build database..."
+	$(DC_BUILD) run --rm openmaptiles-tools-build sh -c 'pgwait && import-osm $(PBF_FILE)'
+
+.PHONY: import-sql-build
+import-sql-build: all start-db-build
+	@echo "Importing SQL layers into build database..."
+	$(DC_BUILD) run --rm openmaptiles-tools-build sh -c 'pgwait && import-sql' | \
+		awk -v s=": WARNING:" '1{print; fflush()} $$0~s{print "\n*** WARNING detected, aborting"; exit(1)}' | \
+		awk '1{print; fflush()} $$0~".*ERROR" {txt=$$0} END{ if(txt){print "\n*** ERROR detected, aborting:"; print txt; exit(1)} }'
+
+.PHONY: build-immutable-image
+build-immutable-image: import-osm-build import-sql-build
+	@$(assert_area_is_given)
+	@echo "Building immutable PostGIS image from database..."
+	@echo "Stopping PostgreSQL gracefully to ensure data consistency..."
+	$(DC_BUILD) exec postgres-build postgres pg_ctl stop -D /var/lib/postgresql/data -m fast || true
+	@sleep 5
+	@echo "Copying data from volume to container filesystem..."
+	@# Create temporary directory in container and copy data there
+	$(DC_BUILD) exec postgres-build sh -c 'mkdir -p /pgdata_backup && cp -a /var/lib/postgresql/data/. /pgdata_backup/'
+	@echo "Creating Dockerfile for immutable image..."
+	@mkdir -p build/immutable
+	@echo "FROM ghcr.io/psumaps/postgis:7.1.1" > build/immutable/Dockerfile
+	@echo "COPY --chown=postgres:postgres pgdata /var/lib/postgresql/data" >> build/immutable/Dockerfile
+	@echo "USER postgres" >> build/immutable/Dockerfile
+	@echo "Exporting data from container..."
+	@docker cp $$(docker ps -aq -f name=indoorequal-build-postgres-build):/pgdata_backup build/immutable/pgdata
+	@echo "Building immutable image..."
+	@cd build/immutable && docker build -t ghcr.io/psumaps/postgis:immutable .
+	@echo "Cleaning up temporary files..."
+	@rm -rf build/immutable
+	@echo "Cleaning up build environment..."
+	$(DC_BUILD) down
+	@echo ""
+	@echo "***********************************************************"
+	@echo "* Immutable PostGIS image created successfully!"
+	@echo "* Image: ghcr.io/psumaps/postgis:immutable"
+	@echo "* You can now use: docker-compose -f docker-compose.prod.yml up"
+	@echo "***********************************************************"
+
+.PHONY: destroy-db-build
+destroy-db-build:
+	@echo "Destroying build database and volumes..."
+	$(DC_BUILD) down -v --remove-orphans
+	docker volume rm indoorequal-build_pgdata_build 2>/dev/null || true
+

@@ -73,6 +73,21 @@ The tiles will be available at http://localhost:8090/
 
 To serve the tiles on another host than `localhost:8090`, for instance `indoorequal.org`, set `OMT_HOST=https://indoorequal.org` and `PPORT=443` to the `.env` file.
 
+### Build immutable PostGIS image
+
+For production deployments, you can create an immutable PostGIS image with pre-imported data:
+
+    make build-immutable-image area=<your-area>
+
+This will:
+1. Import OSM data into a PostgreSQL database using `ghcr.io/psumaps/postgis:7.1.1`
+2. Apply all SQL transformations
+3. Copy data from PostgreSQL volume to image layer
+
+Deploy the immutable image:
+
+    docker-compose -f docker-compose.prod.yml up -d
+
 ## License
 
 All code in this repository is under the [BSD license](./LICENSE.md) and the cartography decisions encoded in the schema and SQL are licensed under [CC-BY](./LICENSE.md).
